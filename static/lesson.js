@@ -41,7 +41,9 @@
             segmentEnd: 0,
             activeIdx: -1,
             isContinuousPlaying: false,
-            currentPlayingIdx: -1
+            currentPlayingIdx: -1,
+            allLessons: [],    // 所有课程列表
+            currentLessonIdx: -1  // 当前课程在列表中的索引
         };
         audio.src = mp3Src;
         bookImgEl.src = bookImgSrc;
@@ -69,6 +71,7 @@
          *  LRC 解析
          * ------------------------------------------------- */
         async function loadLrc() {
+            await loadLessonsForBook();
             const lrcRes = await fetch(lrcSrc);
             const text = await lrcRes.text();
             const lines = text.split(/\r?\n/).filter(Boolean);
@@ -95,6 +98,39 @@
                 state.data.push({en, cn, start, end});
             });
             render();
+        }
+
+        /** -------------------------------------------------
+         *  加载当前书籍的所有课程
+         * ------------------------------------------------- */
+        async function loadLessonsForBook() {
+            try {
+                const dataSrc = 'static/data.json';
+                const dataRes = await fetch(dataSrc);
+                const lessonsData = await dataRes.json();
+                const lessons = lessonsData[book.replace('NCE', '')];
+                if (lessons) {
+                    state.allLessons = lessons;
+                    // 找出当前课程的索引
+                    const currentLessonFile = filename.split('/')[1];
+                    state.currentLessonIdx = lessons.findIndex(
+                        lesson => lesson.filename === currentLessonFile
+                    );
+                }
+            } catch (e) {
+                console.error('Failed to load lessons:', e);
+            }
+        }
+
+        /** -------------------------------------------------
+         *  跳转到下一课程
+         * ------------------------------------------------- */
+        function goToNextLesson() {
+            const nextIdx = state.currentLessonIdx + 1;
+            if (nextIdx < state.allLessons.length) {
+                const nextLesson = state.allLessons[nextIdx];
+                window.location.hash = `${book}/${nextLesson.filename}`;
+            }
         }
 
 
@@ -173,12 +209,16 @@
                     if (nextIdx < state.data.length) {
                         playSegment(nextIdx);
                     } else {
-                        // 到达最后一个句子，停止连续播放
+                        // 当前课程播放完，自动加载下一课程
                         audio.pause();
                         state.isContinuousPlaying = false;
                         state.segmentEnd = 0;
                         state.activeIdx = -1;
                         state.currentPlayingIdx = -1;
+                        // 跳转到下一课程
+                        setTimeout(() => {
+                            goToNextLesson();
+                        }, 500);
                     }
                 } else {
                     audio.pause();
