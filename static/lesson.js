@@ -40,7 +40,8 @@
             by: '',
             segmentEnd: 0,
             activeIdx: -1,
-            isContinuousPlaying: false
+            isContinuousPlaying: false,
+            currentPlayingIdx: -1
         };
         audio.src = mp3Src;
         bookImgEl.src = bookImgSrc;
@@ -126,8 +127,11 @@
         /** -------------------------------------------------
          *  播放区间
          * ------------------------------------------------- */
-        function playSegment(start, end) {
-            state.segmentEnd = end
+        function playSegment(idx) {
+            if (idx < 0 || idx >= state.data.length) return;
+            const {start, end} = state.data[idx];
+            state.segmentEnd = end;
+            state.currentPlayingIdx = idx;
             audio.currentTime = start;
             audio.play();
             state.activeIdx = -1;
@@ -156,8 +160,7 @@
             const target = e.target.closest('.sentence');
             if (!target) return;
             const idx = Number(target.dataset.idx);
-            const {start, end} = state.data[idx];
-            playSegment(start, end);
+            playSegment(idx);
         });
 
         audio.addEventListener('timeupdate', () => {
@@ -165,27 +168,23 @@
             // 区间结束时，连续播放下一个句子
             if (state.segmentEnd && cur >= state.segmentEnd) {
                 if (state.isContinuousPlaying) {
-                    // 获取当前句子的索引
-                    const currentIdx = state.data.findIndex(
-                        item => cur > item.start && (cur < item.end || !item.end)
-                    );
                     // 播放下一个句子
-                    const nextIdx = currentIdx + 1;
+                    const nextIdx = state.currentPlayingIdx + 1;
                     if (nextIdx < state.data.length) {
-                        const nextItem = state.data[nextIdx];
-                        playSegment(nextItem.start, nextItem.end);
+                        playSegment(nextIdx);
                     } else {
                         // 到达最后一个句子，停止连续播放
                         audio.pause();
                         state.isContinuousPlaying = false;
                         state.segmentEnd = 0;
                         state.activeIdx = -1;
+                        state.currentPlayingIdx = -1;
                     }
                 } else {
                     audio.pause();
-                    audio.currentTime = state.segmentEnd;
                     state.segmentEnd = 0;
                     state.activeIdx = -1;
+                    state.currentPlayingIdx = -1;
                 }
                 return;
             }
