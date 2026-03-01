@@ -39,7 +39,8 @@
             title: '',
             by: '',
             segmentEnd: 0,
-            activeIdx: -1
+            activeIdx: -1,
+            isContinuousPlaying: false
         };
         audio.src = mp3Src;
         bookImgEl.src = bookImgSrc;
@@ -130,6 +131,7 @@
             audio.currentTime = start;
             audio.play();
             state.activeIdx = -1;
+            state.isContinuousPlaying = true;
         }
 
         /** -------------------------------------------------
@@ -160,12 +162,31 @@
 
         audio.addEventListener('timeupdate', () => {
             const cur = audio.currentTime;
-            // 区间结束自动暂停
+            // 区间结束时，连续播放下一个句子
             if (state.segmentEnd && cur >= state.segmentEnd) {
-                audio.pause();
-                audio.currentTime = state.segmentEnd;
-                state.segmentEnd = 0;
-                state.activeIdx = -1;
+                if (state.isContinuousPlaying) {
+                    // 获取当前句子的索引
+                    const currentIdx = state.data.findIndex(
+                        item => cur > item.start && (cur < item.end || !item.end)
+                    );
+                    // 播放下一个句子
+                    const nextIdx = currentIdx + 1;
+                    if (nextIdx < state.data.length) {
+                        const nextItem = state.data[nextIdx];
+                        playSegment(nextItem.start, nextItem.end);
+                    } else {
+                        // 到达最后一个句子，停止连续播放
+                        audio.pause();
+                        state.isContinuousPlaying = false;
+                        state.segmentEnd = 0;
+                        state.activeIdx = -1;
+                    }
+                } else {
+                    audio.pause();
+                    audio.currentTime = state.segmentEnd;
+                    state.segmentEnd = 0;
+                    state.activeIdx = -1;
+                }
                 return;
             }
 
